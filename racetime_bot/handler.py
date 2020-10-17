@@ -141,17 +141,20 @@ class RaceHandler:
 
         `message` should be the message string you want to send.
         """
-        await self.ws.send(json.dumps({
-            'action': 'message',
-            'data': {
+        try:
+            await self.ws.send(json.dumps({
+                'action': 'message',
+                'data': {
+                    'message': message,
+                    'guid': str(uuid.uuid4()),
+                }
+            }))
+            self.logger.info('[%(race)s] Message: "%(message)s"' % {
+                'race': self.data.get('name'),
                 'message': message,
-                'guid': str(uuid.uuid4()),
-            }
-        }))
-        self.logger.info('[%(race)s] Message: "%(message)s"' % {
-            'race': self.data.get('name'),
-            'message': message,
-        })
+            })
+        except:
+            pass
 
     async def set_raceinfo(self, info, overwrite=False, prefix=True):
         """
@@ -203,12 +206,15 @@ class RaceHandler:
         """
         Forces a start of the race.
         """
-        await self.ws.send(json.dumps({
-            'action': 'begin'
-        }))
-        self.logger.info('[%(race)s] Forced start' % {
-            'race': self.data.get('name')
-        })
+        try:
+            await self.ws.send(json.dumps({
+                'action': 'begin'
+            }))
+            self.logger.info('[%(race)s] Forced start' % {
+                'race': self.data.get('name')
+            })
+        except:
+            pass
 
     async def cancel_race(self):
         """
