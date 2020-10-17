@@ -146,27 +146,30 @@ class RaceHandler:
 
         Note: for more info on setting up race actions, see `msg_actions.py`
         """
-        if actions and not isinstance(actions, dict):
-            # Assume actions is a list of Action objects
-            actions = {
-                action.label: action.data for action in actions
-            }
-        if direct_to and (actions or pinned):
-            raise Exception('Cannot DM a message with actions or pin')
-        await self.ws.send(json.dumps({
-            'action': 'message',
-            'data': {
+        try:
+            if actions and not isinstance(actions, dict):
+                # Assume actions is a list of Action objects
+                actions = {
+                    action.label: action.data for action in actions
+                }
+            if direct_to and (actions or pinned):
+                raise Exception('Cannot DM a message with actions or pin')
+            await self.ws.send(json.dumps({
+                'action': 'message',
+                'data': {
+                    'message': message,
+                    'direct_to': direct_to,
+                    'actions': actions,
+                    'pinned': pinned,
+                    'guid': str(uuid.uuid4()),
+                }
+            }))
+            self.logger.info('[%(race)s] Message: "%(message)s"' % {
+                'race': self.data.get('name'),
                 'message': message,
-                'direct_to': direct_to,
-                'actions': actions,
-                'pinned': pinned,
-                'guid': str(uuid.uuid4()),
-            }
-        }))
-        self.logger.info('[%(race)s] Message: "%(message)s"' % {
-            'race': self.data.get('name'),
-            'message': message,
-        })
+            })
+        except:
+            pass
 
     async def set_bot_raceinfo(self, info):
         """
@@ -234,12 +237,15 @@ class RaceHandler:
         """
         Forces a start of the race.
         """
-        await self.ws.send(json.dumps({
-            'action': 'begin'
-        }))
-        self.logger.info('[%(race)s] Forced start' % {
-            'race': self.data.get('name')
-        })
+        try:
+            await self.ws.send(json.dumps({
+                'action': 'begin'
+            }))
+            self.logger.info('[%(race)s] Forced start' % {
+                'race': self.data.get('name')
+            })
+        except:
+            pass
 
     async def cancel_race(self):
         """

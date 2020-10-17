@@ -26,13 +26,6 @@ class Bot:
     scan_races_every = 30
     reauthorize_every = 36000
 
-    continue_on = [
-        # Exception types that will not cause the bot to shut down.
-        websockets.ConnectionClosed,
-        websockets.ConnectionClosedOK,
-        websockets.ConnectionClosedError,
-    ]
-
     def __init__(self, category_slug, client_id, client_secret, logger,
                  ssl_context=None):
         """
@@ -151,11 +144,13 @@ class Bot:
         needed.
         """
         while True:
-            # Divide the reauthorization interval by 2 to avoid token expiration
             delay = self.reauthorize_every / 2
             await asyncio.sleep(delay)
-            self.logger.info('Get new access token')
-            self.access_token, self.reauthorize_every = self.authorize()
+            try:
+                self.logger.info('Get new access token')
+                self.access_token, self.reauthorize_every = self.authorize()
+            except:
+                pass
 
     async def refresh_races(self):
         """
@@ -170,60 +165,61 @@ class Bot:
             del self.handlers[task_name]
 
         while True:
-            self.logger.info('Refresh races')
             try:
-                async with aiohttp.request(
-                    method='get',
-                    url=self.http_uri(f'/{self.category_slug}/data'),
-                    raise_for_status=True,
-                ) as resp:
-                    data = json.loads(await resp.read())
-            except Exception:
-                self.logger.error('Fatal error when attempting to retrieve race data.', exc_info=True)
+                self.logger.info('Refresh races')
+                try:
+                    async with aiohttp.request(
+                        method='get',
+                        url=self.http_uri(f'/{self.category_slug}/data'),
+                        raise_for_status=True,
+                    ) as resp:
+                        data = json.loads(await resp.read())
+                except Exception:
+                    self.logger.error('Fatal error when attempting to retrieve race data.', exc_info=True)
+                    await asyncio.sleep(self.scan_races_every)
+                    continue
+                self.races = {}
+                for race in data.get('current_races', []):
+                    self.races[race.get('name')] = race
+
+                for name, summary_data in self.races.items():
+                    if name not in self.handlers:
+                        try:
+                            async with aiohttp.request(
+                                method='get',
+                                url=self.http_uri(summary_data.get('data_url')),
+                                raise_for_status=True,
+                            ) as resp:
+                                race_data = json.loads(await resp.read())
+                        except Exception:
+                            self.logger.error('Fatal error when attempting to retrieve summary data.', exc_info=True)
+                            await asyncio.sleep(self.scan_races_every)
+                            continue
+                        if self.should_handle(race_data):
+                            handler = self.create_handler(race_data)
+                            self.handlers[name] = self.loop.create_task(handler.handle())
+                            self.handlers[name].add_done_callback(partial(done, name))
+                        else:
+                            if name in self.state:
+                                del self.state[name]
+                            self.logger.info(
+                                'Ignoring %(race)s by configuration.'
+                                % {'race': race_data.get('name')}
+                            )
+            finally:
                 await asyncio.sleep(self.scan_races_every)
-                continue
-            self.races = {}
-            for race in data.get('current_races', []):
-                self.races[race.get('name')] = race
-
-            for name, summary_data in self.races.items():
-                if name not in self.handlers:
-                    try:
-                        async with aiohttp.request(
-                            method='get',
-                            url=self.http_uri(summary_data.get('data_url')),
-                            raise_for_status=True,
-                        ) as resp:
-                            race_data = json.loads(await resp.read())
-                    except Exception:
-                        self.logger.error('Fatal error when attempting to retrieve summary data.', exc_info=True)
-                        await asyncio.sleep(self.scan_races_every)
-                        continue
-                    if self.should_handle(race_data):
-                        handler = self.create_handler(race_data)
-                        self.handlers[name] = self.loop.create_task(handler.handle())
-                        self.handlers[name].add_done_callback(partial(done, name))
-                    else:
-                        if name in self.state:
-                            del self.state[name]
-                        self.logger.info(
-                            'Ignoring %(race)s by configuration.'
-                            % {'race': race_data.get('name')}
-                        )
-
-            await asyncio.sleep(self.scan_races_every)
 
     def handle_exception(self, loop, context):
         """
         Handle exceptions that occur during the event loop.
         """
-        self.logger.error(context)
-        exception = context.get('exception')
-        if exception:
-            self.logger.exception(context)
-
-        if not exception or exception.__class__ not in self.continue_on:
-            loop.stop()
+        try:
+            self.logger.error(context)
+            exception = context.get('exception')
+            if exception:
+                self.logger.exception(context)
+        except:
+            pass
 
     def run(self):
         """
