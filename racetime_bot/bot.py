@@ -152,7 +152,8 @@ class Bot:
         This method runs in a constant loop, checking for new races every few
         seconds.
         """
-        def done(task_name, *args):
+        def done(task_name, handler, *args):
+            handler.close_handler()
             del self.handlers[task_name]
 
         while True:
@@ -189,7 +190,7 @@ class Bot:
                         if self.should_handle(race_data):
                             handler = self.create_handler(race_data)
                             self.handlers[name] = self.loop.create_task(handler.handle())
-                            self.handlers[name].add_done_callback(partial(done, name))
+                            self.handlers[name].add_done_callback(partial(done, name, handler))
                         else:
                             if name in self.state:
                                 del self.state[name]
