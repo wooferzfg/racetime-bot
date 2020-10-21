@@ -86,6 +86,12 @@ class RaceHandler:
         """
         pass
 
+    def close_handler(self):
+        """
+        Synchronous actions to call when a handler is closed, even if it's due to an error.
+        """
+        pass
+
     async def error(self, data):
         """
         Consume an incoming "error" type message.
