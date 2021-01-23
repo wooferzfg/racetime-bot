@@ -116,14 +116,15 @@ class RaceHandler:
             self.logger.info('Ignoring bot/system message.')
             return
 
-        words = message.get('message', '').lower().split(' ')
-        if words and words[0].startswith(self.command_prefix.lower()):
-            method = 'ex_' + words[0][len(self.command_prefix):]
+        words = list(filter(None, message.get('message', '').split(' ')))
+        first_word = words[0].lower()
+        if words and first_word.startswith(self.command_prefix.lower()):
+            method = 'ex_' + first_word[len(self.command_prefix):]
             args = words[1:]
             if hasattr(self, method):
                 self.logger.info('[%(race)s] Calling handler for %(word)s' % {
                     'race': self.data.get('name'),
-                    'word': words[0],
+                    'word': first_word,
                 })
                 try:
                     await getattr(self, method)(args, message)
