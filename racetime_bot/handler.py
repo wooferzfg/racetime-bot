@@ -209,6 +209,8 @@ class RaceHandler:
             else:
                 info = self.data.get('info_user') + ' | ' + info
 
+        self.data['info'] = info
+
         await self.ws.send(json.dumps({
             'action': 'setinfo',
             'data': {'info_user': info}
